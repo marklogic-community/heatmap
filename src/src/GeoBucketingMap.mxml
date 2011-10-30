@@ -1,0 +1,616 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright 2002-2010 MarkLogic Corporation.  All Rights Reserved. -->
+<mx:Application 
+	xmlns:mx="http://www.adobe.com/2006/mxml" 
+	layout="vertical" 
+	horizontalAlign="left"
+	applicationComplete="init()" 
+	frameRate="30" 
+	>
+	
+	<mx:Style>	
+		Application{
+        	background-color:"";
+        	background-image:"";
+			padding-left: 0;
+			padding-right: 0;
+			padding-top: 0;
+			padding-bottom: 0;	
+			horizontalGap:0px;
+			verticalGap:0px;	
+		}
+		HSlider {
+			trackSkin: Embed("../assets/horizontal_track_skin.swf");
+			thumbSkin: Embed("../assets/x_slider_thumb_skin.png");
+			thumbOffset: 5px;
+			dataTipOffset: 0px;
+			tickOffset: 10px;
+		}
+		VSlider {
+			trackSkin: Embed("../assets/horizontal_track_skin.swf");
+			thumbSkin: Embed("../assets/Y_slider_thumb_skin.png");
+			thumbOffset: -5px;
+			dataTipOffset: -60px;
+		}
+		.horizontalSliderHBox{
+			horizontalGap:0px;
+			verticalGap:0px;
+		}
+		.mapHBox{
+			horizontalGap:0px;
+			verticalGap:0px;
+		}
+		.spacer{
+		}
+		Button{
+			upSkin: Embed("../assets/button_upskin.png");
+			overSkin: Embed("../assets/button_upskin.png");
+			downSkin: Embed("../assets/button_upskin.png");
+			disabledSkin: Embed("../assets/button_disabledskin.png");
+			disabledColor:#3c3c3c;
+			color:#ffffff;
+		}
+ 
+		
+	</mx:Style>
+
+	
+	
+	<mx:Script>
+		<![CDATA[
+			//import fl.controls.BaseButton;
+			//import fl.controls.LabelButton;	
+			import mx.controls.Button;	
+			import mx.managers.PopUpManager;
+			import mx.core.IFlexDisplayObject;
+			import flash.display.BlendMode;
+			
+			import mx.managers.CursorManager;
+			
+			import mx.effects.Zoom;
+			import com.marklogic.geobucketing.map.YahooBucketMap;
+			import com.marklogic.geobucketing.map.ServerDelegate;
+			import com.marklogic.geobucketing.map.event.ServerEvent;
+			import com.marklogic.geobucketing.map.BrowserDelegate;
+			import com.marklogic.geobucketing.map.event.BrowserEvent;
+			import com.marklogic.geobucketing.map.controls.ZoomSlider;
+			import com.marklogic.geobucketing.map.events.ZoomSliderEvent;
+			import com.marklogic.geobucketing.map.controls.HeatScale;
+			import com.marklogic.geobucketing.map.event.MapEvent;
+			import com.marklogic.geobucketing.map.skins.MapButtonUpSkin;
+			import com.marklogic.geobucketing.map.skins.MapButtonDisabledSkin;
+			import com.marklogic.geobucketing.map.LoadingPopup;
+			
+			import com.yahoo.maps.api.core.location.BoundingBox;
+			import com.yahoo.maps.api.core.location.LatLon;
+			
+			protected var server:ServerDelegate;
+			protected var browser:BrowserDelegate;
+			protected var buckets:Array;
+			protected var isMapInitialized:Boolean = false;
+			protected var appid:String; //flash var
+			protected var startLat:Number; //Flash var
+			protected var startLon:Number; // flash var			
+			protected var _xSteps:Number;
+			protected var _ySteps:Number;
+			protected var mapBounds:BoundingBox;
+			protected var maxFrequency:Number = 0;
+			protected var searchKeyword:String = "";
+			protected var lexicon:String; //used in server queries: ID of the geospacial lexicon
+			protected var constraint:String;
+			protected var dragStartMapBounds:BoundingBox; //used for drag stop
+			protected var initialResultBounds:BoundingBox;
+			protected var initialResultZoom:Number;
+			protected var initialServerResultEvent:ServerEvent;
+			protected var initialMapBounds:BoundingBox;
+			protected var initialXSteps:Number;
+			protected var initialYSteps:Number;
+			//// GUI properties			
+			protected var map:YahooBucketMap;
+			protected var heatScale:HeatScale;
+			protected var zoomBar:ZoomSlider;
+			protected var mapButton:Button;
+			protected var satButton:Button;
+			protected var hybridButton:Button;
+			protected var resetButton:Button;
+			protected var mapButtonUpSkin:MapButtonUpSkin; 
+			protected var mapButtonDisabledSkin:MapButtonDisabledSkin;
+			protected var loadingPopup:IFlexDisplayObject;
+			[Embed(source="../assets/CursorHandPointer.png")]
+			protected var pointCursor:Class; 
+			
+			////GETTERS and SETTERS
+			
+			public function get xSteps():Number{
+				return hSlider.value;
+			}
+			public function set xSteps(p_steps:Number):void{
+				hSlider.value = Math.round(p_steps);
+			}
+			public function get ySteps():Number{
+				return vSlider.value;
+			}
+			public function set ySteps(p_steps:Number):void{
+				vSlider.value = Math.round(p_steps);
+			}
+			
+
+			protected function init():void{
+				server = new ServerDelegate();
+				//server.requestTestData();
+				//server.addEventListener(ServerEvent.NEW_GRID, handleNewGridFromServer, false, 0 , true);
+				server.addEventListener(ServerEvent.NEW_KEYWORD_RESULT_BOUNDING_BOX, handleNewKeywordBoundingBox, false, 0 , true);
+				server.addEventListener(ServerEvent.NEW_FILTERED_BOUNDING_BOX, handleNewFilteredBoundingBox, false, 0 , true);
+				server.addEventListener(ServerEvent.UPDATED_GRID, handleUpdatedGridFromServer, false, 0 , true);
+				server.addEventListener(ServerEvent.UPDATED_FILTERED_GRID, handleUpdatedGridFromServer, false, 0 , true);
+				browser = new BrowserDelegate();
+				browser.addEventListener(BrowserEvent.SEARCH_BY_KEYWORD, handleQueryByKeyword, false, 0 , true);
+				browser.addEventListener(BrowserEvent.NEW_CONSTRAINT, handleNewConstraint, false, 0 , true);
+				
+				//pull x and y grid sizes from flash var
+				if (Application.application.parameters.xGridSize) xSteps = Number(Application.application.parameters.xGridSize);
+				else xSteps = 4;				
+				if (Application.application.parameters.yGridSize) ySteps = Number(Application.application.parameters.yGridSize);
+				else ySteps = 4;
+
+								
+				//PLACE MAP
+				map = new YahooBucketMap(mapContainer.width, mapContainer.height);
+				mapContainer.addChild(map);
+				map.addEventListener(MapEvent.MAP_INITIALIZE, handleMapInitialize, false, 0 , true);
+				map.addEventListener(MapEvent.SELECTION_WITH_CTRL, handleMapSelectionWithCTRL, false, 0 , true);
+				map.addEventListener(MapEvent.MAP_DRAG_START, handleMapDragStart, false, 0 , true);		
+				map.addEventListener(MapEvent.MAP_DRAG_STOP, handleMapDragStop, false, 0 , true);
+				map.addEventListener(MapEvent.MAP_DOUBLE_CLICK, handleMapDoubleClick, false, 0 , true);	
+				map.addEventListener(MapEvent.BUCKET_CLICK, handleBucketClick, false, 0 , true);
+				
+				//pull appid from flash var
+				appid = Application.application.parameters.appid;
+				if (appid) map.yahooAppID = appid;
+				
+				//pull grid line weight from Flash var;
+				if (Application.application.parameters.gridLineWeight) map.gridLineWeight = Number(Application.application.parameters.gridLineWeight);
+				
+				//pull server api URLs from flash vars
+				if (Application.application.parameters.boundingBoxURL) server.boundingBoxURL = Application.application.parameters.boundingBoxURL;
+				if (Application.application.parameters.bucketsURL) server.bucketsURL = Application.application.parameters.bucketsURL;
+				
+				//PLACE MAP BUTTONS	
+				resetButton = new Button();
+				resetButton.width = 80;
+				resetButton.height = 19;
+				resetButton.useHandCursor = true;
+				resetButton.buttonMode = true;
+				resetButton.label = "Reset All";
+				resetButton.addEventListener(MouseEvent.CLICK, handleResetClick, false, 0 , true);
+				mapContainer.addChild(resetButton);
+				resetButton.addEventListener(MouseEvent.ROLL_OVER, handleMouseOver, false, 0 , true);
+				resetButton.addEventListener(MouseEvent.ROLL_OUT, handleMouseOut, false, 0 , true);
+				//////
+				mapButton = new Button();
+				mapButton.width = 80;
+				mapButton.height = 19;
+				mapButton.useHandCursor = true;
+				mapButton.buttonMode = true;
+				mapButton.label = "Map";
+				mapButton.addEventListener(MouseEvent.CLICK, handleMapTypeClick, false, 0 , true);
+				mapContainer.addChild(mapButton);
+				mapButton.addEventListener(MouseEvent.ROLL_OVER, handleMouseOver, false, 0 , true);
+				mapButton.addEventListener(MouseEvent.ROLL_OUT, handleMouseOut, false, 0 , true);
+				////				
+				hybridButton = new Button();
+				hybridButton.width = 80;
+				hybridButton.height = 19;
+				hybridButton.useHandCursor = true;
+				hybridButton.buttonMode = true;
+				hybridButton.label = "Hybrid";
+				hybridButton.addEventListener(MouseEvent.CLICK, handleMapTypeClick, false, 0 , true);
+				mapContainer.addChild(hybridButton);
+				hybridButton.addEventListener(MouseEvent.ROLL_OVER, handleMouseOver, false, 0 , true);
+				hybridButton.addEventListener(MouseEvent.ROLL_OUT, handleMouseOut, false, 0 , true);
+				////
+				satButton = new Button();
+				satButton.width = 80;
+				satButton.height = 19;
+				satButton.useHandCursor = true;
+				satButton.buttonMode = true;
+				satButton.label = "Satellite";
+				satButton.addEventListener(MouseEvent.CLICK, handleMapTypeClick, false, 0 , true);
+				mapContainer.addChild(satButton);
+				satButton.addEventListener(MouseEvent.ROLL_OVER, handleMouseOver, false, 0 , true);
+				satButton.addEventListener(MouseEvent.ROLL_OUT, handleMouseOut, false, 0 , true);
+				////
+				
+				resetButton.x = mapButton.x = hybridButton.x = satButton.x = mapContainer.width - satButton.width - 10;
+				resetButton.y = mapContainer.height - resetButton.height - 20;
+				satButton.y = resetButton.y - resetButton.height - 20;
+				hybridButton.y = satButton.y - resetButton.height - 5;
+				mapButton.y = hybridButton.y - resetButton.height - 5;
+													
+				//PLACE HEATSCALE
+				heatScale = new HeatScale();
+				mapContainer.addChild(heatScale);
+				heatScale.x = resetButton.x - heatScale.width + 5;
+				heatScale.y = resetButton.y;
+				heatScale.addEventListener(MouseEvent.ROLL_OVER, handleMouseOver, false, 0 , true);
+				heatScale.addEventListener(MouseEvent.ROLL_OUT, handleMouseOut, false, 0 , true);
+				//get scale colors from flash vars
+				if (Application.application.parameters.scaleColors){
+					var colors:Array = String(Application.application.parameters.scaleColors).split(",");
+					if (colors.length == 5){
+						heatScale.scaleColors = colors;
+						map.bucketColors = colors;
+					}
+				}
+				
+				//PLACE ZOOMBAR
+				zoomBar = new ZoomSlider();
+				mapContainer.addChild(zoomBar);
+				zoomBar.x = mapContainer.width - zoomBar.width;
+				zoomBar.y = mapButton.y - zoomBar.height - 40;
+				zoomBar.addEventListener(ZoomSlider.BUTTON_OVER, handleMouseOver, false, 0 , true);
+				zoomBar.addEventListener(ZoomSlider.BUTTON_OUT, handleMouseOut, false, 0 , true);
+				zoomBar.addEventListener(ZoomSliderEvent.ZOOM, handleZoomEvent, false, 0 , true);
+			}
+			
+			protected function handleMapSelectionWithShift(event:MapEvent):void{
+				var bb:BoundingBox = event.bounds;
+				map.setMapBounds(bb);
+				zoomBar.zoom = map.zoomLevel;
+				browser.requestFilterByBounds(bb.maxLat, bb.minLat, bb.maxLon, bb.minLon); 
+			}
+			
+			protected function handleMapSelectionWithCTRL(event:MapEvent):void{				
+				map.setMapBounds(event.bounds);
+				zoomBar.zoom = map.zoomLevel;
+				updateBucketData();			
+			}
+			
+			
+			protected function handleMapInitialize(event:Event):void{
+				isMapInitialized = true;				
+				try{
+					startLat = Number(Application.application.parameters.startLat);
+					startLon = Number(Application.application.parameters.startLon);
+				} catch(e:Error){}
+				if (startLat && startLon){
+					map.centerLatLon = new LatLon(startLat,startLon);					
+				}
+				else{
+					map.centerLatLon = new LatLon(38.8225910777533,-40.4296875);
+				}				
+				zoomBar.zoom = 15;
+				map.zoomLevel = 15;
+				//set the map buttons states
+				mapButton.enabled = (mapButton.label.toLowerCase() != map.mapType);
+				satButton.enabled = (satButton.label.toLowerCase() != map.mapType);
+				hybridButton.enabled = (hybridButton.label.toLowerCase() != map.mapType);
+				//// tell browser we are ready
+				browser.sendMapLoaded();
+			}			
+			
+			
+			
+			//BROWSER initiated requests
+			protected function handleQueryByKeyword(p_evt:BrowserEvent):void{
+				if (p_evt.keyword && p_evt.lexicon){
+					searchKeyword = p_evt.keyword;
+					lexicon = p_evt.lexicon;
+					server.requestBoundsUsingKeyword(searchKeyword, lexicon);
+					CursorManager.setBusyCursor();
+				}
+			}
+			protected function handleNewConstraint(p_evt:BrowserEvent):void{
+				if (p_evt.keyword && p_evt.lexicon && p_evt.constraint){
+					searchKeyword = p_evt.keyword;
+					lexicon = p_evt.lexicon;
+					constraint = p_evt.constraint;
+					server.requestBoundsUsingConstraint(p_evt.keyword, p_evt.lexicon, p_evt.constraint);
+					CursorManager.setBusyCursor();
+					showLoadingPopup();
+				}
+			}			
+			//END browser initiated requests
+			
+			
+			
+			
+			protected function updateBucketData():void{
+				if (searchKeyword && lexicon){
+					server.requestDataWithBounds(map.getMapBounds(), xSteps, ySteps, searchKeyword, lexicon);
+					CursorManager.removeBusyCursor();
+					showLoadingPopup();
+				}
+			}
+			
+
+
+			
+			//////////////////////////////////////////////////////
+			////// SERVER DELEGATE EVENT HANDLERS
+/* 						
+			protected function handleNewGridFromServer(p_evt:ServerEvent):void{
+				trace("I have data:  " + p_evt.maxFrequency);
+				maxFrequency = p_evt.maxFrequency;
+				heatScale.max = maxFrequency;
+				mapBounds = p_evt.mapsBounds;
+				
+				if (isMapInitialized){
+					trace("got data and map is already initialized");
+					//map.setBuckets(p_evt.buckets, p_evt.maxFrequency, p_evt.mapsBounds);
+				} 
+				else{
+					trace("got data but map is not initialized");
+					buckets = p_evt.buckets;
+				}
+			}
+ */			
+			protected function handleNewKeywordBoundingBox(p_evt:ServerEvent):void{
+				if (p_evt.isSuccess){
+					initialMapBounds = p_evt.mapsBounds;
+					map.setMapBounds(p_evt.mapsBounds);
+					var mapBB:BoundingBox = map.getMapBounds();
+					zoomBar.zoom = map.zoomLevel;
+					server.requestDataWithBounds(map.getMapBounds(), xSteps, ySteps, searchKeyword, lexicon, false);
+				}
+				else{
+					CursorManager.removeBusyCursor();	
+					PopUpManager.removePopUp(loadingPopup);	
+				}
+			}
+			
+			protected function handleNewFilteredBoundingBox(p_evt:ServerEvent):void{
+				if (p_evt.isSuccess){
+					map.setMapBounds(p_evt.mapsBounds);
+					var mapBB:BoundingBox = map.getMapBounds();
+					zoomBar.zoom = map.zoomLevel;
+					server.requestFilteredBucketsUsingBounds(searchKeyword, lexicon, constraint, xSteps, ySteps);
+				}
+				else{
+					CursorManager.removeBusyCursor();	
+					PopUpManager.removePopUp(loadingPopup);	
+				}
+			}
+			
+			
+			protected function handleUpdatedGridFromServer(p_evt:ServerEvent):void{
+				if (p_evt.isSuccess){				
+					maxFrequency = p_evt.maxFrequency;
+					heatScale.max = maxFrequency;	
+					if (isMapInitialized){
+						map.updateBuckets(p_evt.buckets, p_evt.maxFrequency);
+						var mapBB:BoundingBox = map.getMapBounds();
+						browser.sendMapBounds(mapBB.maxLat, mapBB.minLat, mapBB.maxLon, mapBB.minLon); 
+						if (p_evt.isInitialResult){
+							initialResultBounds = map.getBucketResultBounds();
+							initialResultZoom = map.zoomLevel;
+							initialServerResultEvent = p_evt;							 
+							initialXSteps = xSteps;
+							initialYSteps = ySteps;
+							map.drawResultBorder(initialResultBounds);
+						}
+						if (map.zoomLevel >= initialResultZoom) map.drawGrid();
+						try{ map.resultBorder.visible = (map.zoomLevel >= initialResultZoom) } catch(e:Error){}
+					} 
+					else{
+						//received data but map is not initialized;
+						buckets = p_evt.buckets;
+					}
+				}
+				PopUpManager.removePopUp(loadingPopup);
+				CursorManager.removeBusyCursor();
+			}
+			
+			
+			
+			
+			///////////////////////////////////////////////
+			//// HANDLE Map GUI interactions
+			protected function handleZoomEvent(p_evt:ZoomSliderEvent):void{
+				map.zoomLevel = zoomBar.zoom;
+				if(!initialResultBounds) return; 
+				var mapBB:BoundingBox = map.getMapBounds();
+				var initBB:BoundingBox = initialResultBounds;				
+				
+				// THE FOLLOWING condition is to stop asking for new bucket data if you are zooming out beyond the initial result set
+				if (initBB.maxLat > mapBB.maxLat && initBB.minLat < mapBB.minLat && initBB.maxLon > mapBB.maxLon || initBB.minLon < mapBB.minLon){
+					// viewing within the initial search result therefore we can update bucket data
+					updateBucketData();
+				}
+				else{
+					// viewing beyond the initial data set
+					xSteps = initialXSteps;
+					ySteps = initialYSteps;
+					handleUpdatedGridFromServer(initialServerResultEvent);
+				}
+			}
+			
+			protected function handleMapTypeClick(p_evt:MouseEvent):void{
+				var type:String = p_evt.target.label.toLowerCase();
+				map.mapType = type;
+				mapButton.enabled = (p_evt.target != mapButton);
+				satButton.enabled = (p_evt.target != satButton);
+				hybridButton.enabled = (p_evt.target != hybridButton);				
+			}
+			
+			protected function handleResetClick(p_evt:MouseEvent):void{
+				if (initialMapBounds){
+					map.setMapBounds(initialMapBounds);
+					zoomBar.zoom = map.zoomLevel;											 
+					xSteps = initialXSteps;
+					ySteps = initialYSteps;
+					handleUpdatedGridFromServer(initialServerResultEvent);	
+				}			
+			}
+			
+			protected function handleMouseOver(p_evt:MouseEvent):void{
+				CursorManager.setCursor(pointCursor, 1);
+			}
+			protected function handleMouseOut(p_evt:MouseEvent):void{
+				CursorManager.removeCursor(CursorManager.currentCursorID);
+			}
+			
+			
+			
+			protected function handleMapDragStart(p_evt:MapEvent):void{
+				dragStartMapBounds = map.getMapBounds();
+			}
+			
+			protected function handleMapDragStop(p_evt:MapEvent):void{				
+				////FIRST make sure some results are present
+				if(!initialResultBounds) return; 
+				
+				////SECOND check to see if map has buckets
+				if(!map.hasBuckets()) return;
+				var mapBB:BoundingBox = map.getMapBounds();
+				browser.sendMapBounds(mapBB.maxLat, mapBB.minLat, mapBB.maxLon, mapBB.minLon);
+				
+				////THIRD test to see if initgrid is within viewable map bounds
+				if (map.zoomLevel >= initialResultZoom) return;
+				
+				////FOURTH test to see if dragging did not expose any unfilled map area
+				var gridBB:BoundingBox = map.getBucketResultBounds();			
+				var initBB:BoundingBox = initialResultBounds;
+				if (gridBB.maxLat > mapBB.maxLat && gridBB.minLat < mapBB.minLat && gridBB.maxLon > mapBB.maxLon && gridBB.minLon < mapBB.minLon) return;
+				
+				////FINALLY determine direction and update grid
+				var nwLatLon:LatLon = dragStartMapBounds.northwest;
+				var dLat:Number = mapBB.northwest.lat - nwLatLon.lat;
+				var dLon:Number = mapBB.northwest.lon - nwLatLon.lon;
+				var swLL:LatLon;
+				var neLL:LatLon;
+				
+				var n:Number;
+				var s:Number;
+				var e:Number;
+				var w:Number;
+				
+				var numBucketsWide:Number;
+				var numBucketsHigh:Number;				
+				
+				var draggedUp:Boolean = (dLat<0 && dLon == 0);
+				var draggedDown:Boolean = (dLat>0 && dLon == 0);
+				var draggedLeft:Boolean = (dLat == 0 && dLon >0);
+				var draggedRight:Boolean = (dLat == 0 && dLon<0);				
+				var draggedNW:Boolean = (dLat<0 && dLon >0);
+				var draggedSE:Boolean = (dLat>0 && dLon<0);
+				var draggedSW:Boolean = (dLat>0 && dLon>0);
+				var draggedNE:Boolean = (dLat<0 && dLon<0);				
+
+				if (draggedNW || draggedLeft){
+					numBucketsWide = Math.ceil(Math.abs(mapBB.maxLon - gridBB.minLon)/map.bucketWidth);
+					numBucketsHigh = Math.ceil(Math.abs(gridBB.maxLat - mapBB.minLat)/map.bucketHeight);
+					n = gridBB.maxLat;
+					w = gridBB.minLon;					
+					s = n - (map.bucketHeight * numBucketsHigh);
+					e = w + (map.bucketWidth * numBucketsWide);
+					swLL = new LatLon(s,w);
+					neLL = new LatLon(n,e);
+				}
+				else if (draggedSE || draggedRight){
+					numBucketsWide = Math.ceil(Math.abs(gridBB.maxLon - mapBB.minLon)/map.bucketWidth);
+					numBucketsHigh = Math.ceil(Math.abs(mapBB.maxLat - gridBB.minLat)/map.bucketHeight);
+					s = gridBB.minLat;
+					e = gridBB.maxLon;
+					n = s + (map.bucketHeight * numBucketsHigh);
+					w = e - (map.bucketWidth * numBucketsWide);					
+					swLL = new LatLon(s,w);
+					neLL = new LatLon(n,e);
+				}
+				else if (draggedSW || draggedDown){
+					numBucketsWide = Math.ceil(Math.abs(mapBB.maxLon - gridBB.minLon)/map.bucketWidth);
+					numBucketsHigh = Math.ceil(Math.abs(mapBB.maxLat - gridBB.minLat)/map.bucketHeight);
+					s = gridBB.minLat;
+					w = gridBB.minLon;
+					n = s + (map.bucketHeight * numBucketsHigh);
+					e = w + (map.bucketWidth * numBucketsWide);	
+					swLL = new LatLon(s,w);
+					neLL = new LatLon(n,e);
+				}
+				else if (draggedNE || draggedUp){
+					numBucketsWide = Math.ceil(Math.abs(gridBB.maxLon - mapBB.minLon)/map.bucketWidth);
+					numBucketsHigh = Math.ceil(Math.abs(gridBB.maxLat - mapBB.minLat)/map.bucketHeight);
+					n = gridBB.maxLat;
+					e = gridBB.maxLon;
+					s = n - (map.bucketHeight * numBucketsHigh);
+					w = e - (map.bucketWidth * numBucketsWide);			
+					swLL = new LatLon(s,w);
+					neLL = new LatLon(n,e);
+				}
+				var draggedBounds:BoundingBox = new BoundingBox(swLL, neLL);
+				if (searchKeyword && lexicon){
+					 server.requestDataWithBounds(draggedBounds, numBucketsWide, numBucketsHigh, searchKeyword, lexicon);
+					 CursorManager.setBusyCursor();
+				}				
+			}
+			protected function handleSliderChange(p_evt:Event):void{
+				if (xSteps>0 && ySteps>0) updateBucketData();
+				else map.overlayManager.removeAllOverlays();
+			}
+			
+			protected function handleMapDoubleClick(p_evt:MapEvent):void{
+				updateBucketData();
+			}
+			
+			protected function handleBucketClick(p_evt:MapEvent):void{
+				updateBucketData();
+				zoomBar.zoom = map.zoomLevel;
+			}
+			
+			
+			protected function showLoadingPopup():void{
+				loadingPopup = PopUpManager.createPopUp(this, LoadingPopup, true); // popup modal dialog
+				PopUpManager.centerPopUp(loadingPopup);
+			}
+				
+						
+			
+			
+   			   
+/*  			////FOR testing
+			protected function handleSearchClick():void{
+				//this is for testing
+				searchKeyword = searchTI.text;
+				//server.requestNewBucketData(searchKeyword, map.width, map.height);
+				lexicon = "entity:gpe";
+				server.requestBoundsUsingKeyword(searchKeyword, lexicon);
+				CursorManager.setBusyCursor();
+			} 
+ */    				 			
+			 
+			
+			
+		]]>
+	</mx:Script>
+	   
+    <mx:HBox width="100%" height="100%" styleName="mapHBox">
+		<mx:VSlider id="vSlider" height="100%" 
+			maximum="50" snapInterval="1"
+			sliderThumbClass="com.marklogic.geobucketing.map.skins.SliderThumb" 
+			change="handleSliderChange(event)" 
+			mouseOver="handleMouseOver(event as MouseEvent)"			
+			mouseOut="handleMouseOut(event as MouseEvent)"
+			/>
+		<mx:UIComponent id="mapContainer" width="100%" height="100%"/>		
+	</mx:HBox>
+	<mx:HBox width="100%" styleName="horizontalSliderHBox">
+		<mx:HBox height="{hSlider.height}" width ="{vSlider.width}" styleName="spacer"/>
+		<mx:VBox width="100%">
+			<!--<mx:Label text="0"/>-->
+			<mx:HSlider id="hSlider" width="100%" 
+				maximum="50" snapInterval="1"
+				sliderThumbClass="com.marklogic.geobucketing.map.skins.SliderThumb"
+				change="handleSliderChange(event)" 
+				mouseOver="handleMouseOver(event as MouseEvent)"			
+				mouseOut="handleMouseOut(event as MouseEvent)"
+				/>
+		</mx:VBox>
+	</mx:HBox>
+	
+	
+<!--	<mx:HBox>
+		<mx:TextInput id="searchTI" text="test"/>
+		<mx:Button id="searchSubmit" click="handleSearchClick()" label="submit"/>
+	</mx:HBox>
+-->
+</mx:Application>

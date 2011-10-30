@@ -1,0 +1,61 @@
+<!--  Copyright 2002-2010 MarkLogic Corporation.  All Rights Reserved. -->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" 
+"http://www.w3.org/TR/1999/PR-xhtml1-19991210/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+	<head>
+		<title>MarkLogic Server 4.0 Geospatial Range Demo</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+		<script src="js/main.js" type="text/javascript" language="Javascript"></script>
+		<link rel="stylesheet" href="styles/main.css" type="text/css" />
+		<script type="text/javascript" src="flash/js/swfobject.js"></script>
+		<script type="text/javascript">
+
+
+			//this method is to get a reference to the SWF for making calls with ExternalInterface
+			function thisMovie(movieName) {
+			  if (navigator.appName.indexOf("Microsoft") != -1 && ieversion >= 6)
+				return window[movieName];
+				else return document[movieName];
+			}
+
+			//initialization parameters for SWFOBJECT
+			var flashvars = {
+								appid: "INSERT_APP_ID_HERE",
+								startLat: "39",
+								startLon: "-104",
+								boundingBoxURL: "bounding-box.xqy",
+								bucketsURL: "buckets.xqy",
+								scaleColors: "0xF6DC86,0xF8BA69,0xF3995F,0xEE6651,0xDE404F",
+								xGridSize: "5",
+								yGridSize: "5",
+								gridLineWeight: "1"
+							};
+			var params = {wmode:"transparent"};
+			var attributes = {id: "GeoBucketingMap"};
+
+			//SWFOBJECT call to load the GeoBucketingMap SWF into the specified DIV
+			swfobject.embedSWF("flash/GeoBucketingMap.swf", "geoBucketContent", "750", "550", "9.0.45", "flash/expressInstall.swf", flashvars, params, attributes);
+		</script>
+	</head>
+
+	<body bgcolor="#e9e9e9">
+	<div id="container">
+		<div id="searchForm">
+			<input type="text" id="searchKeyword"/>
+			<button id="search">search</button>
+		</div>
+    
+		<div id="flashcontent">
+			<div id="geoBucketContent">
+				<p>
+					<a href="http://www.adobe.com/go/getflashplayer">
+						<img src="http://www.adobe.com/images/shared/download_buttons/get_flash_player.gif" alt="Get Adobe Flash player" />
+					</a>
+				</p>
+			</div>
+		</div>
+		<div id="updateArea">&nbsp;</div>
+	</div>
+	</body>
+
+</html>
