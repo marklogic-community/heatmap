@@ -1,10 +1,15 @@
 MarkLogic Heatmap Demo
 -----------------------
 
+NOTE
+
+As of 2012, this demo's integration with a third-party mapping service API (Yahoo maps) is no longer functional.  
 
 OVERVIEW
 
-This is a deployable version of the heatmap visualization demonstration found at http://heatmaps.demo.marklogic.com.
+This is a deployable version of the heatmap visualization demonstration found at http://heatmaps.demo.marklogic.com (see above, 
+the live demo is currently not functional).
+
 This demo shows how MarkLogic Server's geospatial bucketing feature can be combined with its search capabilities
 to deliver an interactive heatmap visualization of search results.  This package provides all the necessary files
 to deploy this demo on appropriately marked up data sets.  It also includes the Flex source code for the visualization
