@@ -1,0 +1,91 @@
+html { 
+	height: 100%; 
+}
+
+body { 
+	height: 95%; 
+	background-color:#555;
+	color:white;
+}
+
+.hbox {
+  display: -webkit-box;
+  -webkit-box-orient: horizontal;
+  -webkit-box-align: stretch;
+
+  display: -moz-box;
+  -moz-box-orient: horizontal;
+  -moz-box-align: stretch;
+
+  display: box;
+  box-orient: horizontal;
+  box-align: stretch;
+
+  width: 100%;
+  height: 90%;
+  border: 2px solid peru;
+}
+
+.searchbox {
+	text-align:left;
+}
+
+.footer{
+	font-size:11px;
+	padding-top:10px;
+	vertical-align:text-bottom;
+}
+
+#query{
+	width: 75%;
+	height: 1.5em;
+}
+
+#map_canvas {
+	-webkit-box-flex: 1;
+	-moz-box-flex: 1;
+	box-flex: 1;
+	
+	height:100%;
+	width:75%;
+	float: left;
+	position: relative;
+	overflow: hidden;
+	overflow-x: hidden;
+	overflow-y: hidden;
+}
+
+#result_container{
+	-webkit-box-flex: 2;
+	-moz-box-flex: 2;
+	box-flex: 2;
+	font: 12px/15px Arial;
+	text-align: center;
+	margin: 10px;
+	
+	word-wrap: break-word;
+	text-overflow: ellipsis;
+	height: 100%;
+	width: 25%;
+}
+
+.result_page div,button{
+	display:inline;
+}
+
+.results {
+	height: 100%;
+	overflow: scroll;
+}
+
+.article:nth-child(odd)    { background-color:#666; }
+.article:nth-child(even)    { background-color:#888; }
+.article:hover	{background-color:#aaa;}
+
+.article {
+	font-size: 12px;
+	text-align: left;
+	padding: 5px 0px 5px 5px;
+}
+
+.keywords {font-size:10px;}

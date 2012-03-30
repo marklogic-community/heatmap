@@ -1,1 +1,0 @@
-﻿package com.marklogic.geobucketing.map.events{	import flash.events.Event;	public class ZoomSliderEvent extends Event{		public static var ZOOM:String = "com.marklogic.geobucketing.map.events.ZOOM";		public var zoom:Number;				public function ZoomSliderEvent(type:String, bubbles:Boolean=false, cancelable:Boolean=false)	{			super(type, bubbles, cancelable);		}			}}

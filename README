@@ -1,0 +1,39 @@
+MarkLogic Heatmap Demo
+-----------------------
+
+OVERVIEW
+-----------------------
+This is a deployable version of the heatmap visualization demonstration found at http://heatmaps.demo.marklogic.com.
+This demo shows how MarkLogic Server's geospatial bucketing feature can be combined with its search capabilities
+to deliver an interactive heatmap visualization of search results.  This package provides all the necessary files
+to deploy this demo on appropriately marked up data sets.
+
+
+INSTALLATION
+-----------------------
+If you haven't already done so, download and install the latest version of MarkLogic Server from http://community.marklogic.com/
+
+Open the MarkLogic Configuration Manager (http://localhost:8002/nav/?type=databases) and import the heatmap-db.xml config file to create the required database and forest.
+
+Extract the heatmap-forest.tar.gz archive
+
+Load the data by opening the MarkLogic Admin interface and:
+ - in the forest subsection, open the newly created heatmap forest config (name defaults to heatmap-db-1)
+ - select the Backup/Restore tab
+ - restore the forest from the extracted archive directory (probably {checkout directory}/heatmap-demo/setup/forest)
+
+Configure the webapp by going to the MarkLogic Admin interface and:
+ - create a new HTTP app server (lefthand side tree: Groups->Default->App Servers: Create HTTP tab)
+ - set the server name to heatmap-demo (or whatever you want to call it)
+ - set the root to be the full system filepath to the heatmap-demo directory ({checkout directory}/heatmap-demo)
+ - set the port be any open port on your local machine (9000 is usually safe)
+ - set the database to heatmap-db
+ - set the authentication to be application-level
+ - set the url rewriter to be url-rewriter.xqy
+
+Your done! you should now be able to navigate to http://localhost:9000/heatmap
+
+*Additionally this app provides a REST based search endpoint that exposes search results as either XML or JSON
+examples:
+ map search: http://localhost:9000/search/map.json?q=republican&north=90.0&east=0.0&south=-90.0&west=180.0
+ text search: http://localhost:9000/search/text.xml?q=democrat&north=90.0&east=0.0&south=-90.0&west=180.0&page=1
