@@ -55,6 +55,7 @@ return (
 							<div>  |  </div>
 							<button id="next">next</button>
 						</div>
+						<h5>*heatmap visualizes the number of references to a geolocation contained in all articles in the current search results</h5>
 					</div>
 				</div>
 				<div class="footer">Source availible @ <a href="http://code.google.com/p/heatmap-demo/">code.google.com</a> or <a href="https://github.com/marklogic/heatmap">github</a></div>

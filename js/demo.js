@@ -79,9 +79,10 @@ function update_results(){
 		parameters: {q:$('query').value, north:ne.lat(), east:ne.lng(), south:sw.lat(), west:sw.lng()},
 		onSuccess: function(resp){
 			var mapdata = resp.responseText.evalJSON(true);
+			var points = (mapdata.result == null) ? [] : mapdata.result.data;
 			heatmap.setDataSet({
-				max: 3, // this parameter is used to adjust the heatmaps radial gradient alpha transition.
-				data: mapdata.result.data
+				max: (points.length * Math.LN10) % 5, // this parameter is used to adjust the heatmaps radial gradient alpha transition.
+				data: points
 			});
 			
 			heatmap.draw();
@@ -108,6 +109,13 @@ function update_text_results(newpage){
 				$('results').innerHTML = "";
 				
 				var textdata = resp.responseText.evalJSON(true);
+				
+				if(!(textdata.result.data instanceof Array)){
+					var temp = [];
+					temp.push(textdata.result.data);
+					
+					textdata.result.data = temp;
+				}
 				
 				$('results').insert(new Element('div',{'class':'total_results'}).update("Total: " + textdata.result.total + " -- Page: " + current_page));
 				textdata.result.data.each(function(i){				
