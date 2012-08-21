@@ -32,9 +32,7 @@ return (
 	        	<title>MarkLogic HeatMap Demo</title>
 				<link href='http://fonts.googleapis.com/css?family=Gorditas' rel='stylesheet' type='text/css'/>
 				<link href='heatmap.css' rel='stylesheet' type='text/css'/>
-				<script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false&amp;region=US"></script>
-				<script type="text/javascript" src="js/heatmap.js"></script>
-				<script type="text/javascript" src="js/heatmap-gmaps.js"></script>
+				<script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?sensor=false&amp;libraries=visualization"></script>
 				<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/prototype/1.7.0.0/prototype.js"></script>
 				<script type="text/javascript" src="js/demo.js"></script>
 	        </head>
